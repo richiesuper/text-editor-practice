@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -121,12 +122,39 @@ char editor_read_key(void) {
 	return c;
 }
 
+// Gets the cursor position in the terminal
+int get_cursor_position(int* rows, int* cols) {
+	char buf[32];
+	unsigned int i = 0;
+
+	if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
+		return -1;
+
+	while (i < sizeof buf - 1) {
+		if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
+		if (buf[i] == 'R') break;
+		i++;
+	}
+
+	buf[i] = '\0';
+
+	if (buf[0] != '\x1b' || buf[1] != '[') return -1;
+	if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1;
+	printf("\r\n&buf[1]: '%s'\r\n", &buf[1]);
+
+	return 0;
+}
+
 // Gets the window size of terminal
 int get_window_size(int* rows, int* cols) {
 	struct winsize ws;
 
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-		return -1;
+		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) {
+			return -1;
+		}
+
+		return get_cursor_position(rows, cols);
 	} else {
 		*rows = ws.ws_row;
 		*cols = ws.ws_col;
@@ -135,22 +163,50 @@ int get_window_size(int* rows, int* cols) {
 	}
 }
 
+/***** APPEND BUFFER *****/
+
+struct AppendBuffer {
+	char* b;
+	int len;
+};
+
+#define APPEND_BUFFER_INIT {NULL, 0}
+
+void ab_append(struct AppendBuffer* ab, const char* s, int len) {
+	char* new = realloc(ab->b, ab->len + len);
+
+	if (new == NULL) return;
+	memcpy(&new[ab->len], s, len);
+	ab->b = new;
+	ab->len += len;
+}
+
+void ab_free(struct AppendBuffer* ab) {
+	free(ab->b);
+}
+
 /***** OUTPUT *****/
 
 // Draws the tildes marking the lines / rows
-void editor_draw_rows(void) {
+void editor_draw_rows(struct AppendBuffer* ab) {
 	for (int y = 0; y < ec.screenRows; y++) {
-		write(STDOUT_FILENO, "~\r\n", 3); // Write a tilde followed by carriage return and new line
+		ab_append(ab, "~", 1); // Append a tilde to buffer
+
+		if (y < ec.screenRows - 1) {
+			ab_append(ab, "\r\n", 2);
+		}
 	}
 }
 
 // Refreshes the terminal screen
 void editor_refresh_screen(void) {
+	struct AppendBuffer ab = APPEND_BUFFER_INIT;
+
 	/* Write to stdout a VT100 escape sequence of \x1b[2J with size 4 bytes
 	 * \x1b is the escape character, it is represented as 27 in decimal
 	 * [2J means clear ('J') the entire screen (arg '2')
 	 */
-	write(STDOUT_FILENO, "\x1b[2J", 4);
+	ab_append(&ab, "\x1b[2J", 4);
 
 	/* Write to stdout a VT100 escape sequence of \x1b[H with size 3 bytes
 	 * [H means reposition the cursor ('H') at row 1 collumn 1 of the terminal
@@ -159,11 +215,14 @@ void editor_refresh_screen(void) {
 	 * Row and collumn arguments are separated by ';' as you see there
 	 * Row and collumn numbering starts from 1
 	 */
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	ab_append(&ab, "\x1b[H", 3);
 
-	editor_draw_rows(); // Draw tildes on new lines
+	editor_draw_rows(&ab); // Draws the text editor rows
 
-	write(STDOUT_FILENO, "\x1b[H", 3); // Reposition the cursor again to the top left after drawing those tildes
+	ab_append(&ab, "\x1b[H", 3);
+
+	write(STDOUT_FILENO, ab.b, ab.len); // Do the screen clearing and cursor repositioning
+	ab_free(&ab);
 }
 
 /***** INPUT *****/
@@ -191,6 +250,7 @@ void init_editor(void) {
 	if (get_window_size(&ec.screenRows, &ec.screenCols) == -1)
 		die("init_editor()::get_window_size()");
 }
+
 // Program starts here
 int main() {
 	enable_raw_mode(); // Enables raw mode in terminal
