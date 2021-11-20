@@ -21,10 +21,15 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum EditorKey {
-	ARROW_LEFT = 177013,
-	ARROW_RIGHT = 228922,
-	ARROW_UP = 285727,
-	ARROW_DOWN = 200948
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN,
+	DEL,
+	HOME,
+	END,
+	PAGE_UP,
+	PAGE_DOWN
 };
 
 /***** DATA *****/
@@ -137,15 +142,48 @@ int editor_read_key(void) {
 		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
 
 		if (seq[0] == '[') {
+			if (seq[1] >= '0' && seq[1] <= '9') {
+				if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+						case '1':
+							return HOME;
+						case '3':
+							return DEL;
+						case '4':
+							return END;
+						case '5':
+							return PAGE_UP;
+						case '6':
+							return PAGE_DOWN;
+						case '7':
+							return HOME;
+						case '8':
+							return END;
+					}
+				}
+			} else {
+				switch (seq[1]) {
+					case 'A':
+						return ARROW_UP;
+					case 'B':
+						return ARROW_DOWN;
+					case 'C':
+						return ARROW_RIGHT;
+					case 'D':
+						return ARROW_LEFT;
+					case 'H':
+						return HOME;
+					case 'F':
+						return END;
+				}
+			}
+		} else if (seq[0] == 'O') {
 			switch (seq[1]) {
-				case 'A':
-					return ARROW_UP;
-				case 'B':
-					return ARROW_DOWN;
-				case 'C':
-					return ARROW_RIGHT;
-				case 'D':
-					return ARROW_LEFT;
+				case 'H':
+					return HOME;
+				case 'F':
+					return END;
 			}
 		}
 
@@ -322,6 +360,24 @@ void editor_process_keypress(void) {
 			write(STDOUT_FILENO, "\x1b[H", 3); // Reposition the cursor to row 1 collumn 1
 			exit(0);
 			break;
+
+		case HOME:
+			ec.curx = 0;
+			break;
+		case END:
+			ec.curx = ec.screenCols - 1;
+			break;
+
+		case PAGE_UP:
+		case PAGE_DOWN:
+			{
+				int times = ec.screenRows;
+				while (times--) {
+					editor_move_cursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+				}
+			}
+			break;
+
 		case ARROW_LEFT:
 		case ARROW_RIGHT:
 		case ARROW_UP:
