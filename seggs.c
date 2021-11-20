@@ -196,8 +196,7 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 	for (int y = 0; y < ec.screenRows; y++) {
 		if (y == ec.screenRows / 3) {
 			char welcome[80];
-			int welcomeLen = snprintf(welcome, sizeof welcome,
-									  "Seggs editor -- version %s", EDITOR_VERSION);
+			int welcomeLen = snprintf(welcome, sizeof welcome, "Seggs editor -- version %s", EDITOR_VERSION);
 
 			if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
 
@@ -238,9 +237,9 @@ void editor_refresh_screen(void) {
 	// ab_append(&ab, "\x1b[2J", 4);
 
 	/* Write to stdout a VT100 escape sequence of \x1b[H with size 3 bytes
-	 * [H means reposition the cursor ('H') at row 1 collumn 1 of the terminal
-	 * H command defaults to row 1 collumn 1, but you can change it
-	 * E.g. [420;69H means reposition cursor to row 420 collumn 69 of the terminal
+	 * [H means reposition the cursor ('H') at collumn 1 row 1 of the terminal
+	 * H command defaults to collumn 1 row 1, but you can change it
+	 * E.g. [69;420H means reposition cursor to row 69 collumn 420 of the terminal
 	 * Row and collumn arguments are separated by ';' as you see there
 	 * Row and collumn numbering starts from 1
 	 */
@@ -248,7 +247,9 @@ void editor_refresh_screen(void) {
 
 	editor_draw_rows(&ab); // Draws the text editor rows
 
-	ab_append(&ab, "\x1b[H", 3);
+	char buf[32];
+	snprintf(buf, sizeof buf, "\x1b[%d;%dH", ec.cury + 1, ec.curx + 1);
+	ab_append(&ab, buf, strlen(buf));
 
 	// Show the cursor again after done drawing
 	ab_append(&ab, "\x1b[?25h", 6);
@@ -258,6 +259,24 @@ void editor_refresh_screen(void) {
 }
 
 /***** INPUT *****/
+
+// Handles cursor movement
+void editor_move_cursor(char key) {
+	switch (key) {
+		case 'h':
+			ec.curx--;
+			break;
+		case 'l':
+			ec.curx++;
+			break;
+		case 'k':
+			ec.cury--;
+			break;
+		case 'j':
+			ec.cury++;
+			break;
+	}
+}
 
 // Handles keypress input
 void editor_process_keypress(void) {
@@ -270,6 +289,12 @@ void editor_process_keypress(void) {
 			write(STDOUT_FILENO, "\x1b[H", 3); // Reposition the cursor to row 1 collumn 1
 			exit(0);
 			break;
+		case 'h':
+		case 'l':
+		case 'k':
+		case 'j':
+			editor_move_cursor(c);
+			break;
 	}
 }
 
@@ -277,6 +302,10 @@ void editor_process_keypress(void) {
 
 // Acquire the terminal size
 void init_editor(void) {
+	// Initialize the cursor positions
+	ec.curx = 0;
+	ec.cury = 0;
+
 	// Gets the terminal rows and collumn size
 	// If it fails, die() is called
 	if (get_window_size(&ec.screenRows, &ec.screenCols) == -1)
