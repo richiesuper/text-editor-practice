@@ -12,6 +12,12 @@ When I do finish making this text editor according to the resource, I want to
 make this text editor more useful with more functionality and customizability.
 I wish this text editor could be somewhat similar to vi / vim, but we'll see.
 
+## TODOs
+
+- Break up the program into separate files with header files
+
+- Implement hjkl movements like vi / vim
+
 ## Building
 
 You can build this project provided that you have a C compiler such as
