@@ -266,8 +266,8 @@ void editor_refresh_screen(void) {
 	// ab_append(&ab, "\x1b[2J", 4);
 
 	/* Write to stdout a VT100 escape sequence of \x1b[H with size 3 bytes
-	 * [H means reposition the cursor ('H') at collumn 1 row 1 of the terminal
-	 * H command defaults to collumn 1 row 1, but you can change it
+	 * [H means reposition the cursor ('H') at row 1 collumn 1 of the terminal
+	 * H command defaults to row 1 collumn 1, but you can change it
 	 * E.g. [69;420H means reposition cursor to row 69 collumn 420 of the terminal
 	 * Row and collumn arguments are separated by ';' as you see there
 	 * Row and collumn numbering starts from 1
@@ -293,16 +293,20 @@ void editor_refresh_screen(void) {
 void editor_move_cursor(int key) {
 	switch (key) {
 		case ARROW_LEFT:
-			ec.curx--;
+			if (ec.curx != 0)
+				ec.curx--;
 			break;
 		case ARROW_RIGHT:
-			ec.curx++;
+			if (ec.curx != ec.screenCols - 1)
+				ec.curx++;
 			break;
 		case ARROW_UP:
-			ec.cury--;
+			if (ec.cury != 0)
+				ec.cury--;
 			break;
 		case ARROW_DOWN:
-			ec.cury++;
+			if (ec.cury != ec.screenRows - 1)
+				ec.cury++;
 			break;
 	}
 }
