@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -19,7 +20,12 @@
 
 /***** DATA *****/
 
-struct termios origTermios; // Struct 'termios' named origTermios which contains fields defined in termios.h
+struct EditorConfig {
+	struct termios origTermios; // Struct 'termios' named origTermios which contains fields defined in termios.h
+
+	int screenRows;
+	int screenCols;
+} ec;
 
 /***** TERMINAL *****/
 
@@ -38,7 +44,7 @@ void disable_raw_mode(void) {
 	/* Resets the terminal attrs to the original value
 	 * If it fails, die() is called
 	 */
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &origTermios) == -1)
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &ec.origTermios) == -1)
 		die("disable_raw_mode()::tcsetattr()");
 }
 
@@ -47,12 +53,12 @@ void enable_raw_mode(void) {
 	/* Gets the terminal attrs and puts it into origTermios
 	 * If it fails, die() is called
 	 */
-	if (tcgetattr(STDIN_FILENO, &origTermios) == -1)
+	if (tcgetattr(STDIN_FILENO, &ec.origTermios) == -1)
 		die("enable_raw_mode()::tcgetattr()");
 
 	atexit(disable_raw_mode); // Runs the disable_raw_mode() function at program exit
 
-	struct termios raw = origTermios; // Copy the original terminal attrs to raw
+	struct termios raw = ec.origTermios; // Copy the original terminal attrs to raw
 
 	/* Disable Ctrl-m, Ctrl-s, and Ctrl-q
 	 * **********************************
@@ -115,11 +121,25 @@ char editor_read_key(void) {
 	return c;
 }
 
+// Gets the window size of terminal
+int get_window_size(int* rows, int* cols) {
+	struct winsize ws;
+
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+		return -1;
+	} else {
+		*rows = ws.ws_row;
+		*cols = ws.ws_col;
+
+		return 0;
+	}
+}
+
 /***** OUTPUT *****/
 
 // Draws the tildes marking the lines / rows
 void editor_draw_rows(void) {
-	for (int y = 0; y < 24; y++) {
+	for (int y = 0; y < ec.screenRows; y++) {
 		write(STDOUT_FILENO, "~\r\n", 3); // Write a tilde followed by carriage return and new line
 	}
 }
@@ -164,8 +184,18 @@ void editor_process_keypress(void) {
 
 /***** INIT *****/
 
+// Acquire the terminal size
+void init_editor(void) {
+	// Gets the terminal rows and collumn size
+	// If it fails, die() is called
+	if (get_window_size(&ec.screenRows, &ec.screenCols) == -1)
+		die("init_editor()::get_window_size()");
+}
+// Program starts here
 int main() {
 	enable_raw_mode(); // Enables raw mode in terminal
+
+	init_editor(); // Gets the terminal size (initializing the screenRows and screenCols fields in ec)
 
 	/* Refreshes the screen and runs the input gathering and processing function */
 	while (1) {
