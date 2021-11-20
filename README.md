@@ -3,7 +3,7 @@
 This repository will contain my coding practice, making a text editor
 from scratch.
 
-I based this practice from this wonderful resource: [Build Your Own Text Editor](https://github.com/richiesuper/text-editor-practice.git).
+I based this practice from this wonderful resource: [Build Your Own Text Editor](https://viewsourcecode.org/snaptoken/kilo/index.html).
 
 For the time being, I am going to stick with the instructions there while
 learning how to make this text editor.
