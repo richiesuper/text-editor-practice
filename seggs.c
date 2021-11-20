@@ -17,6 +17,7 @@
 
 /***** DEFINES *****/
 
+#define EDITOR_VERSION "4.20.69"
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 /***** DATA *****/
@@ -24,8 +25,11 @@
 struct EditorConfig {
 	struct termios origTermios; // Struct 'termios' named origTermios which contains fields defined in termios.h
 
-	int screenRows;
-	int screenCols;
+	int screenRows; // Number of terminal rows
+	int screenCols; // Number of terminal collumns
+
+	int curx; // Cursor x position
+	int cury; // Cursor y position
 } ec;
 
 /***** TERMINAL *****/
@@ -190,10 +194,30 @@ void ab_free(struct AppendBuffer* ab) {
 // Draws the tildes marking the lines / rows
 void editor_draw_rows(struct AppendBuffer* ab) {
 	for (int y = 0; y < ec.screenRows; y++) {
-		ab_append(ab, "~", 1); // Append a tilde to buffer
+		if (y == ec.screenRows / 3) {
+			char welcome[80];
+			int welcomeLen = snprintf(welcome, sizeof welcome,
+									  "Seggs editor -- version %s", EDITOR_VERSION);
+
+			if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
+
+			int padding = (ec.screenCols - welcomeLen) / 2;
+			if (padding) {
+				ab_append(ab, "~", 1);
+				padding--;
+			}
+
+			while (padding--) ab_append(ab, " ", 1);
+
+			ab_append(ab, welcome, welcomeLen); // Appends the welcome message
+		} else {
+			ab_append(ab, "~", 1); // Append a tilde to buffer
+		}
+
+		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
 
 		if (y < ec.screenRows - 1) {
-			ab_append(ab, "\r\n", 2);
+			ab_append(ab, "\r\n", 2); // Append carriage return and new line
 		}
 	}
 }
@@ -202,11 +226,16 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 void editor_refresh_screen(void) {
 	struct AppendBuffer ab = APPEND_BUFFER_INIT;
 
+	// Hide the cursor before drawing the tildes
+	ab_append(&ab, "\x1b[?25l", 6);
+
 	/* Write to stdout a VT100 escape sequence of \x1b[2J with size 4 bytes
 	 * \x1b is the escape character, it is represented as 27 in decimal
 	 * [2J means clear ('J') the entire screen (arg '2')
 	 */
-	ab_append(&ab, "\x1b[2J", 4);
+
+	// No longer used, replaced entire screen clearing with line clearing
+	// ab_append(&ab, "\x1b[2J", 4);
 
 	/* Write to stdout a VT100 escape sequence of \x1b[H with size 3 bytes
 	 * [H means reposition the cursor ('H') at row 1 collumn 1 of the terminal
@@ -221,8 +250,11 @@ void editor_refresh_screen(void) {
 
 	ab_append(&ab, "\x1b[H", 3);
 
+	// Show the cursor again after done drawing
+	ab_append(&ab, "\x1b[?25h", 6);
+
 	write(STDOUT_FILENO, ab.b, ab.len); // Do the screen clearing and cursor repositioning
-	ab_free(&ab);
+	ab_free(&ab); // Free the dynamically allocated memory of ab->b (the buffer)
 }
 
 /***** INPUT *****/
