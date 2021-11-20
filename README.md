@@ -16,7 +16,7 @@ I wish this text editor could be somewhat similar to vi / vim, but we'll see.
 
 - Break up the program into separate files with header files
 
-- Implement hjkl movements like vi / vim
+- [DONE] Implement hjkl movements like vi / vim
 
 ## Building
 
