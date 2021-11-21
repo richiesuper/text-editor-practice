@@ -539,7 +539,9 @@ void editor_process_keypress(void) {
 			ec.curx = 0;
 			break;
 		case END:
-			ec.curx = ec.screenCols - 1;
+			if (ec.cury < ec.numRows) {
+				ec.curx = ec.row[ec.cury].size;
+			}
 			break;
 
 		case PAGE_UP:
