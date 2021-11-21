@@ -24,6 +24,7 @@
 
 /***** DEFINES *****/
 
+#define EDITOR_NAME "TEd - Text EDit"
 #define EDITOR_VERSION "4.20.69"
 #define EDITOR_TAB_STOP 8
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -404,7 +405,7 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 		if (fileRow >= ec.numRows) {
 			if (ec.numRows == 0 && y == ec.screenRows / 3) {
 				char welcome[80];
-				int welcomeLen = snprintf(welcome, sizeof welcome, "Seggs editor -- version %s", EDITOR_VERSION);
+				int welcomeLen = snprintf(welcome, sizeof welcome, "%s -- version %s", EDITOR_NAME, EDITOR_VERSION);
 
 				if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
 
