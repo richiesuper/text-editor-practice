@@ -423,13 +423,17 @@ void editor_refresh_screen(void) {
 
 // Handles cursor movement
 void editor_move_cursor(int key) {
+	struct EditorRow* row = (ec.cury >= ec.numRows) ? NULL : &ec.row[ec.cury];
+
 	switch (key) {
 		case ARROW_LEFT:
 			if (ec.curx != 0)
 				ec.curx--;
 			break;
 		case ARROW_RIGHT:
-			ec.curx++;
+			if (row && ec.curx < row->size) {
+				ec.curx++;
+			}
 			break;
 		case ARROW_UP:
 			if (ec.cury != 0)
