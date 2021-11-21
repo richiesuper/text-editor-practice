@@ -56,6 +56,7 @@ struct EditorConfig {
 	int cury; // Cursor y position
 
 	int rowOffset;
+	int colOffset;
 
 	int numRows;
 	struct EditorRow* row;
@@ -324,6 +325,14 @@ void editor_scroll(void) {
 	if (ec.cury >= ec.rowOffset + ec.screenRows) {
 		ec.rowOffset = ec.cury - ec.screenRows + 1;
 	}
+
+	if (ec.curx < ec.colOffset) {
+		ec.colOffset = ec.curx;
+	}
+
+	if (ec.curx >= ec.colOffset + ec.screenCols) {
+		ec.colOffset = ec.curx - ec.screenCols + 1;
+	}
 }
 
 // Draws the tildes marking the lines / rows
@@ -350,12 +359,17 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 				ab_append(ab, "~", 1); // Append a tilde to buffer
 			}
 		} else {
-			int len = ec.row[fileRow].size;
+			int len = ec.row[fileRow].size - ec.colOffset;
+
+			if (len < 0) {
+				len = 0;
+			}
+
 			if (len > ec.screenCols) {
 				len = ec.screenCols;
 			}
 
-			ab_append(ab, ec.row[fileRow].chars, len);
+			ab_append(ab, &ec.row[fileRow].chars[ec.colOffset], len);
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
@@ -415,8 +429,7 @@ void editor_move_cursor(int key) {
 				ec.curx--;
 			break;
 		case ARROW_RIGHT:
-			if (ec.curx != ec.screenCols - 1)
-				ec.curx++;
+			ec.curx++;
 			break;
 		case ARROW_UP:
 			if (ec.cury != 0)
@@ -475,6 +488,7 @@ void init_editor(void) {
 	ec.curx = 0;
 	ec.cury = 0;
 	ec.rowOffset = 0;
+	ec.colOffset = 0;
 	ec.numRows = 0;
 	ec.row = NULL;
 
