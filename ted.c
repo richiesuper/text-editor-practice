@@ -545,6 +545,16 @@ void editor_process_keypress(void) {
 		case PAGE_UP:
 		case PAGE_DOWN:
 			{
+				if (c == PAGE_UP) {
+					ec.cury = ec.rowOffset;
+				} else if (c == PAGE_DOWN) {
+					ec.cury = ec.rowOffset + ec.screenRows - 1;
+
+					if (ec.cury > ec.numRows) {
+						ec.cury = ec.numRows;
+					}
+				}
+
 				int times = ec.screenRows;
 				while (times--) {
 					editor_move_cursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
