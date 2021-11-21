@@ -6,12 +6,19 @@
 
 /***** INCLUDES *****/
 
+// Feature Test Macros
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
+// Actual Includes
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -34,6 +41,11 @@ enum EditorKey {
 
 /***** DATA *****/
 
+struct EditorRow {
+	int size;
+	char* chars;
+};
+
 struct EditorConfig {
 	struct termios origTermios; // Struct 'termios' named origTermios which contains fields defined in termios.h
 
@@ -42,6 +54,9 @@ struct EditorConfig {
 
 	int curx; // Cursor x position
 	int cury; // Cursor y position
+
+	int numRows;
+	struct EditorRow row;
 } ec;
 
 /***** TERMINAL *****/
@@ -234,6 +249,34 @@ int get_window_size(int* rows, int* cols) {
 	}
 }
 
+/***** FILE IO *****/
+
+void editor_open(char* filename) {
+	FILE* fp = fopen(filename, "r");
+	if (!fp) {
+		die("editor_open()::fopen()");
+	}
+
+	char* line = NULL;
+	size_t lineCap = 0;
+	ssize_t lineLen = getline(&line, &lineCap, fp);
+
+	if (lineLen != -1) {
+		while (lineLen > 0 && (line[lineLen - 1] == '\n' || line[lineLen - 1] == '\r')) {
+			lineLen--;
+		}
+
+		ec.row.size = lineLen;
+		ec.row.chars = malloc(lineLen + 1);
+		memcpy(ec.row.chars, line, lineLen);
+		ec.row.chars[lineLen] = '\0';
+		ec.numRows = 1;
+	}
+
+	free(line);
+	fclose(fp);
+}
+
 /***** APPEND BUFFER *****/
 
 struct AppendBuffer {
@@ -261,23 +304,32 @@ void ab_free(struct AppendBuffer* ab) {
 // Draws the tildes marking the lines / rows
 void editor_draw_rows(struct AppendBuffer* ab) {
 	for (int y = 0; y < ec.screenRows; y++) {
-		if (y == ec.screenRows / 3) {
-			char welcome[80];
-			int welcomeLen = snprintf(welcome, sizeof welcome, "Seggs editor -- version %s", EDITOR_VERSION);
+		if (y >= ec.numRows) {
+			if (ec.numRows == 0 && y == ec.screenRows / 3) {
+				char welcome[80];
+				int welcomeLen = snprintf(welcome, sizeof welcome, "Seggs editor -- version %s", EDITOR_VERSION);
 
-			if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
+				if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
 
-			int padding = (ec.screenCols - welcomeLen) / 2;
-			if (padding) {
-				ab_append(ab, "~", 1);
-				padding--;
+				int padding = (ec.screenCols - welcomeLen) / 2;
+				if (padding) {
+					ab_append(ab, "~", 1);
+					padding--;
+				}
+
+				while (padding--) ab_append(ab, " ", 1);
+
+				ab_append(ab, welcome, welcomeLen); // Appends the welcome message
+			} else {
+				ab_append(ab, "~", 1); // Append a tilde to buffer
+			}
+		} else {
+			int len = ec.row.size;
+			if (len > ec.screenCols) {
+				len = ec.screenCols;
 			}
 
-			while (padding--) ab_append(ab, " ", 1);
-
-			ab_append(ab, welcome, welcomeLen); // Appends the welcome message
-		} else {
-			ab_append(ab, "~", 1); // Append a tilde to buffer
+			ab_append(ab, ec.row.chars, len);
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
@@ -394,6 +446,7 @@ void init_editor(void) {
 	// Initialize the cursor positions
 	ec.curx = 0;
 	ec.cury = 0;
+	ec.numRows = 0;
 
 	// Gets the terminal rows and collumn size
 	// If it fails, die() is called
@@ -402,10 +455,14 @@ void init_editor(void) {
 }
 
 // Program starts here
-int main() {
+int main(int argc, char* argv[argc + 1]) {
 	enable_raw_mode(); // Enables raw mode in terminal
 
 	init_editor(); // Gets the terminal size (initializing the screenRows and screenCols fields in ec)
+
+	if (argc >= 2) {
+		editor_open(argv[1]);
+	}
 
 	/* Refreshes the screen and runs the input gathering and processing function */
 	while (1) {
