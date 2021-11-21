@@ -56,7 +56,7 @@ struct EditorConfig {
 	int cury; // Cursor y position
 
 	int numRows;
-	struct EditorRow row;
+	struct EditorRow* row;
 } ec;
 
 /***** TERMINAL *****/
@@ -226,6 +226,9 @@ int get_cursor_position(int* rows, int* cols) {
 
 	if (buf[0] != '\x1b' || buf[1] != '[') return -1;
 	if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1;
+
+	// IDK why this code below is still here :v
+	// I don't think it's needed anymore btw
 	printf("\r\n&buf[1]: '%s'\r\n", &buf[1]);
 
 	return 0;
@@ -249,6 +252,20 @@ int get_window_size(int* rows, int* cols) {
 	}
 }
 
+/***** ROW OPERATIONS *****/
+
+void editor_append_row(char* s, size_t len) {
+	ec.row = realloc(ec.row, sizeof(struct EditorRow) * (ec.numRows + 1));
+
+	int at = ec.numRows;
+
+	ec.row[at].size = len;
+	ec.row[at].chars = malloc(len + 1);
+	memcpy(ec.row[at].chars, s, len);
+	ec.row[at].chars[len] = '\0';
+	ec.numRows++;
+}
+
 /***** FILE IO *****/
 
 void editor_open(char* filename) {
@@ -259,18 +276,14 @@ void editor_open(char* filename) {
 
 	char* line = NULL;
 	size_t lineCap = 0;
-	ssize_t lineLen = getline(&line, &lineCap, fp);
+	ssize_t lineLen;
 
-	if (lineLen != -1) {
+	while ((lineLen = getline(&line, &lineCap, fp)) != -1) {
 		while (lineLen > 0 && (line[lineLen - 1] == '\n' || line[lineLen - 1] == '\r')) {
 			lineLen--;
 		}
 
-		ec.row.size = lineLen;
-		ec.row.chars = malloc(lineLen + 1);
-		memcpy(ec.row.chars, line, lineLen);
-		ec.row.chars[lineLen] = '\0';
-		ec.numRows = 1;
+		editor_append_row(line, lineLen);
 	}
 
 	free(line);
@@ -324,12 +337,12 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 				ab_append(ab, "~", 1); // Append a tilde to buffer
 			}
 		} else {
-			int len = ec.row.size;
+			int len = ec.row[y].size;
 			if (len > ec.screenCols) {
 				len = ec.screenCols;
 			}
 
-			ab_append(ab, ec.row.chars, len);
+			ab_append(ab, ec.row[y].chars, len);
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
@@ -447,6 +460,7 @@ void init_editor(void) {
 	ec.curx = 0;
 	ec.cury = 0;
 	ec.numRows = 0;
+	ec.row = NULL;
 
 	// Gets the terminal rows and collumn size
 	// If it fails, die() is called
