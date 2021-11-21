@@ -55,6 +55,8 @@ struct EditorConfig {
 	int curx; // Cursor x position
 	int cury; // Cursor y position
 
+	int rowOffset;
+
 	int numRows;
 	struct EditorRow* row;
 } ec;
@@ -314,10 +316,21 @@ void ab_free(struct AppendBuffer* ab) {
 
 /***** OUTPUT *****/
 
+void editor_scroll(void) {
+	if (ec.cury < ec.rowOffset) {
+		ec.rowOffset = ec.cury;
+	}
+
+	if (ec.cury >= ec.rowOffset + ec.screenRows) {
+		ec.rowOffset = ec.cury - ec.screenRows + 1;
+	}
+}
+
 // Draws the tildes marking the lines / rows
 void editor_draw_rows(struct AppendBuffer* ab) {
 	for (int y = 0; y < ec.screenRows; y++) {
-		if (y >= ec.numRows) {
+		int fileRow = y + ec.rowOffset;
+		if (fileRow >= ec.numRows) {
 			if (ec.numRows == 0 && y == ec.screenRows / 3) {
 				char welcome[80];
 				int welcomeLen = snprintf(welcome, sizeof welcome, "Seggs editor -- version %s", EDITOR_VERSION);
@@ -337,12 +350,12 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 				ab_append(ab, "~", 1); // Append a tilde to buffer
 			}
 		} else {
-			int len = ec.row[y].size;
+			int len = ec.row[fileRow].size;
 			if (len > ec.screenCols) {
 				len = ec.screenCols;
 			}
 
-			ab_append(ab, ec.row[y].chars, len);
+			ab_append(ab, ec.row[fileRow].chars, len);
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
@@ -355,6 +368,8 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 
 // Refreshes the terminal screen
 void editor_refresh_screen(void) {
+	editor_scroll();
+
 	struct AppendBuffer ab = APPEND_BUFFER_INIT;
 
 	// Hide the cursor before drawing the tildes
@@ -408,7 +423,7 @@ void editor_move_cursor(int key) {
 				ec.cury--;
 			break;
 		case ARROW_DOWN:
-			if (ec.cury != ec.screenRows - 1)
+			if (ec.cury < ec.numRows)
 				ec.cury++;
 			break;
 	}
@@ -459,6 +474,7 @@ void init_editor(void) {
 	// Initialize the cursor positions
 	ec.curx = 0;
 	ec.cury = 0;
+	ec.rowOffset = 0;
 	ec.numRows = 0;
 	ec.row = NULL;
 
