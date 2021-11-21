@@ -427,8 +427,12 @@ void editor_move_cursor(int key) {
 
 	switch (key) {
 		case ARROW_LEFT:
-			if (ec.curx != 0)
+			if (ec.curx != 0) {
 				ec.curx--;
+			} else if (ec.cury > 0) {
+				ec.cury--;
+				ec.curx = ec.row[ec.cury].size;
+			}
 			break;
 		case ARROW_RIGHT:
 			if (row && ec.curx < row->size) {
@@ -436,12 +440,14 @@ void editor_move_cursor(int key) {
 			}
 			break;
 		case ARROW_UP:
-			if (ec.cury != 0)
+			if (ec.cury != 0) {
 				ec.cury--;
+			}
 			break;
 		case ARROW_DOWN:
-			if (ec.cury < ec.numRows)
+			if (ec.cury < ec.numRows) {
 				ec.cury++;
+			}
 			break;
 	}
 
