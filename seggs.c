@@ -395,7 +395,7 @@ void editor_refresh_screen(void) {
 	editor_draw_rows(&ab); // Draws the text editor rows
 
 	char buf[32];
-	snprintf(buf, sizeof buf, "\x1b[%d;%dH", ec.cury + 1, ec.curx + 1);
+	snprintf(buf, sizeof buf, "\x1b[%d;%dH", (ec.cury - ec.rowOffset) + 1, ec.curx + 1);
 	ab_append(&ab, buf, strlen(buf));
 
 	// Show the cursor again after done drawing
