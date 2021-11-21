@@ -25,6 +25,7 @@
 /***** DEFINES *****/
 
 #define EDITOR_VERSION "4.20.69"
+#define EDITOR_TAB_STOP 8
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum EditorKey {
@@ -44,6 +45,9 @@ enum EditorKey {
 struct EditorRow {
 	int size;
 	char* chars;
+
+	int rsize;
+	char* render;
 };
 
 struct EditorConfig {
@@ -257,6 +261,37 @@ int get_window_size(int* rows, int* cols) {
 
 /***** ROW OPERATIONS *****/
 
+void editor_update_row(struct EditorRow* row) {
+	int tabs = 0;
+	for (int j = 0; j < row->size; j++) {
+		if (row->chars[j] == '\t') {
+			tabs++;
+		}
+	}
+
+	free(row->render);
+	row->render = malloc(row->size + tabs * (EDITOR_TAB_STOP - 1) + 1);
+
+	int idx = 0;
+	for (int j = 0; j < row->size; j++) {
+		if (row->chars[j] == '\t') {
+			row->render[idx] = ' ';
+			idx++;
+
+			while (idx % EDITOR_TAB_STOP) {
+				row->render[idx] = ' ';
+				idx++;
+			}
+		} else {
+			row->render[idx] = row->chars[j];
+			idx++;
+		}
+	}
+
+	row->render[idx] = '\0';
+	row->rsize = idx;
+}
+
 void editor_append_row(char* s, size_t len) {
 	ec.row = realloc(ec.row, sizeof(struct EditorRow) * (ec.numRows + 1));
 
@@ -266,6 +301,12 @@ void editor_append_row(char* s, size_t len) {
 	ec.row[at].chars = malloc(len + 1);
 	memcpy(ec.row[at].chars, s, len);
 	ec.row[at].chars[len] = '\0';
+
+	ec.row[at].rsize = 0;
+	ec.row[at].render = NULL;
+
+	editor_update_row(&ec.row[at]);
+
 	ec.numRows++;
 }
 
@@ -359,7 +400,7 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 				ab_append(ab, "~", 1); // Append a tilde to buffer
 			}
 		} else {
-			int len = ec.row[fileRow].size - ec.colOffset;
+			int len = ec.row[fileRow].rsize - ec.colOffset;
 
 			if (len < 0) {
 				len = 0;
@@ -369,7 +410,7 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 				len = ec.screenCols;
 			}
 
-			ab_append(ab, &ec.row[fileRow].chars[ec.colOffset], len);
+			ab_append(ab, &ec.row[fileRow].render[ec.colOffset], len);
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
