@@ -1,5 +1,5 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Wshadow -pedantic -std=c99
 
-seggs: seggs.c
+ted: ted.c
 	$(CC) $(CFLAGS) -o $@ $^
