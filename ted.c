@@ -59,6 +59,8 @@ struct EditorConfig {
 	int curx; // Cursor x position
 	int cury; // Cursor y position
 
+	int rx; // struct EditorRow's render x coordinate
+
 	int rowOffset;
 	int colOffset;
 
@@ -261,6 +263,19 @@ int get_window_size(int* rows, int* cols) {
 
 /***** ROW OPERATIONS *****/
 
+int editor_row_curx_to_rx(struct EditorRow* row, int curx) {
+	int rx = 0;
+	for (int j = 0; j < curx; j++) {
+		if (row->chars[j] == '\t') {
+			rx += (EDITOR_TAB_STOP - 1) - (rx % EDITOR_TAB_STOP);
+		}
+
+		rx++;
+	}
+
+	return rx;
+}
+
 void editor_update_row(struct EditorRow* row) {
 	int tabs = 0;
 	for (int j = 0; j < row->size; j++) {
@@ -359,6 +374,12 @@ void ab_free(struct AppendBuffer* ab) {
 /***** OUTPUT *****/
 
 void editor_scroll(void) {
+	ec.rx = 0;
+
+	if (ec.cury < ec.numRows) {
+		ec.rx = editor_row_curx_to_rx(&ec.row[ec.cury], ec.curx);
+	}
+
 	if (ec.cury < ec.rowOffset) {
 		ec.rowOffset = ec.cury;
 	}
@@ -367,12 +388,12 @@ void editor_scroll(void) {
 		ec.rowOffset = ec.cury - ec.screenRows + 1;
 	}
 
-	if (ec.curx < ec.colOffset) {
-		ec.colOffset = ec.curx;
+	if (ec.rx < ec.colOffset) {
+		ec.colOffset = ec.rx;
 	}
 
-	if (ec.curx >= ec.colOffset + ec.screenCols) {
-		ec.colOffset = ec.curx - ec.screenCols + 1;
+	if (ec.rx >= ec.colOffset + ec.screenCols) {
+		ec.colOffset = ec.rx - ec.screenCols + 1;
 	}
 }
 
@@ -450,7 +471,7 @@ void editor_refresh_screen(void) {
 	editor_draw_rows(&ab); // Draws the text editor rows
 
 	char buf[32];
-	snprintf(buf, sizeof buf, "\x1b[%d;%dH", (ec.cury - ec.rowOffset) + 1, (ec.curx - ec.colOffset) + 1);
+	snprintf(buf, sizeof buf, "\x1b[%d;%dH", (ec.cury - ec.rowOffset) + 1, (ec.rx - ec.colOffset) + 1);
 	ab_append(&ab, buf, strlen(buf));
 
 	// Show the cursor again after done drawing
@@ -547,6 +568,7 @@ void init_editor(void) {
 	// Initialize the cursor positions
 	ec.curx = 0;
 	ec.cury = 0;
+	ec.rx = 0;
 	ec.rowOffset = 0;
 	ec.colOffset = 0;
 	ec.numRows = 0;
