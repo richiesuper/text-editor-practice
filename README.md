@@ -18,6 +18,8 @@ I wish this text editor could be somewhat similar to vi / vim, but we'll see.
 
 - Implement modes (normal, insert, visual) like vi / vim
 
+- Implement line numbering (static and relative) like vi / vim
+
 ## Building
 
 You can build this project provided that you have a C compiler such as
