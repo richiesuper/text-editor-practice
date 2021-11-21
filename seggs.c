@@ -437,6 +437,9 @@ void editor_move_cursor(int key) {
 		case ARROW_RIGHT:
 			if (row && ec.curx < row->size) {
 				ec.curx++;
+			} else if (row && ec.curx == row->size) {
+				ec.cury++;
+				ec.curx = 0;
 			}
 			break;
 		case ARROW_UP:
