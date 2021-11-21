@@ -444,6 +444,12 @@ void editor_move_cursor(int key) {
 				ec.cury++;
 			break;
 	}
+
+	row = (ec.cury >= ec.numRows) ? NULL : &ec.row[ec.cury];
+	int rowLen = row ? row->size : 0;
+	if (ec.curx > rowLen) {
+		ec.curx = rowLen;
+	}
 }
 
 // Handles keypress input
