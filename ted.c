@@ -67,6 +67,8 @@ struct EditorConfig {
 
 	int numRows;
 	struct EditorRow* row;
+
+	char* filename;
 } ec;
 
 /***** TERMINAL *****/
@@ -329,6 +331,9 @@ void editor_append_row(char* s, size_t len) {
 /***** FILE IO *****/
 
 void editor_open(char* filename) {
+	free(ec.filename);
+	ec.filename = strdup(filename);
+
 	FILE* fp = fopen(filename, "r");
 	if (!fp) {
 		die("editor_open()::fopen()");
@@ -436,11 +441,35 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 		}
 
 		ab_append(ab, "\x1b[K", 3); // Clears things to the right of cursor in current line
+		ab_append(ab, "\r\n", 2); // Append carriage return and new line
+	}
+}
 
-		if (y < ec.screenRows - 1) {
-			ab_append(ab, "\r\n", 2); // Append carriage return and new line
+void editor_draw_status_bar(struct AppendBuffer* ab) {
+	ab_append(ab, "\x1b[7m", 4);
+
+	char status[80];
+	char rstatus[80];
+
+	int len = snprintf(status, sizeof status, "%.20s - %d lines", ec.filename ? ec.filename : "[No Name]", ec.numRows);
+	int rlen = snprintf(rstatus, sizeof rstatus, "%d/%d", ec.cury + 1, ec.numRows);
+
+	if (len > ec.screenCols) {
+		len = ec.screenCols;
+	}
+	ab_append(ab, status, len);
+
+	while (len < ec.screenCols) {
+		if (ec.screenCols - len == rlen) {
+			ab_append(ab, rstatus, rlen);
+			break;
+		} else {
+			ab_append(ab, " ", 1);
+			len++;
 		}
 	}
+
+	ab_append(ab, "\x1b[m", 3);
 }
 
 // Refreshes the terminal screen
@@ -470,6 +499,8 @@ void editor_refresh_screen(void) {
 	ab_append(&ab, "\x1b[H", 3);
 
 	editor_draw_rows(&ab); // Draws the text editor rows
+
+	editor_draw_status_bar(&ab); // Draws the text editor status bar
 
 	char buf[32];
 	snprintf(buf, sizeof buf, "\x1b[%d;%dH", (ec.cury - ec.rowOffset) + 1, (ec.rx - ec.colOffset) + 1);
@@ -586,11 +617,14 @@ void init_editor(void) {
 	ec.colOffset = 0;
 	ec.numRows = 0;
 	ec.row = NULL;
+	ec.filename = NULL;
 
 	// Gets the terminal rows and collumn size
 	// If it fails, die() is called
 	if (get_window_size(&ec.screenRows, &ec.screenCols) == -1)
 		die("init_editor()::get_window_size()");
+
+	ec.screenRows -= 1;
 }
 
 // Program starts here
