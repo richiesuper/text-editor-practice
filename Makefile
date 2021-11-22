@@ -7,10 +7,13 @@ BIN_DIR=bin
 SRCS=*.c
 EXECS=$(BIN_DIR)/ted
 
-all: $(EXECS)
+all: prep $(EXECS)
 
 clean:
 	rm -rf $(EXECS)
+
+prep:
+	mkdir -p bin
 
 $(BIN_DIR)/ted: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^
@@ -19,4 +22,4 @@ $(BIN_DIR)/ted: $(SRCS)
 #	$(WINDOWS_CC) $(WINDOWS_CFLAGS) -o $@ $^
 
 .PHONY:
-	all clean
+	all clean prep
