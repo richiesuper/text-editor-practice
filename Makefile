@@ -4,7 +4,7 @@ CC=gcc
 CFLAGS=-Wall -Wextra -Wshadow -pedantic -std=c99 -O2
 # WINDOWS_CFLAGS=$(CFLAGS) -L./windows-includes
 BIN_DIR=bin
-SRCS=*.c
+SRCS=ted.c
 EXECS=$(BIN_DIR)/ted
 
 all: prep $(EXECS)
