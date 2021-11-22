@@ -15,11 +15,13 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 /***** DEFINES *****/
@@ -27,6 +29,7 @@
 #define EDITOR_NAME "TEd - Text EDit"
 #define EDITOR_AUTHOR "Richie Seputro"
 #define EDITOR_VERSION "4.20.69"
+#define STATUS_DURATION 8
 #define EDITOR_TAB_STOP 8
 #define CTRL_KEY(k) ((k) & 0x1f)
 
@@ -70,6 +73,9 @@ struct EditorConfig {
 	struct EditorRow* row;
 
 	char* filename;
+
+	char statusmsg[80];
+	time_t statusmsg_time;
 } ec;
 
 /***** TERMINAL *****/
@@ -488,6 +494,20 @@ void editor_draw_status_bar(struct AppendBuffer* ab) {
 	}
 
 	ab_append(ab, "\x1b[m", 3);
+	ab_append(ab, "\r\n", 2);
+}
+
+void editor_draw_message_bar(struct AppendBuffer* ab) {
+	ab_append(ab, "\x1b[K", 3);
+
+	int msglen = strlen(ec.statusmsg);
+	if (msglen > ec.screenCols) {
+		msglen = ec.screenCols;
+	}
+
+	if (msglen && time(NULL) - ec.statusmsg_time < STATUS_DURATION) {
+		ab_append(ab, ec.statusmsg, msglen);
+	}
 }
 
 // Refreshes the terminal screen
@@ -520,6 +540,8 @@ void editor_refresh_screen(void) {
 
 	editor_draw_status_bar(&ab); // Draws the text editor status bar
 
+	editor_draw_message_bar(&ab); // Draws the text editor status message
+
 	char buf[32];
 	snprintf(buf, sizeof buf, "\x1b[%d;%dH", (ec.cury - ec.rowOffset) + 1, (ec.rx - ec.colOffset) + 1);
 	ab_append(&ab, buf, strlen(buf));
@@ -529,6 +551,15 @@ void editor_refresh_screen(void) {
 
 	write(STDOUT_FILENO, ab.b, ab.len); // Do the screen clearing and cursor repositioning
 	ab_free(&ab); // Free the dynamically allocated memory of ab->b (the buffer)
+}
+
+void editor_set_status_message(const char* fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(ec.statusmsg, sizeof ec.statusmsg, fmt, ap);
+	va_end(ap);
+
+	ec.statusmsg_time = time(NULL);
 }
 
 /***** INPUT *****/
@@ -636,13 +667,15 @@ void init_editor(void) {
 	ec.numRows = 0;
 	ec.row = NULL;
 	ec.filename = NULL;
+	ec.statusmsg[0] = '\0';
+	ec.statusmsg_time = 0;
 
 	// Gets the terminal rows and collumn size
 	// If it fails, die() is called
 	if (get_window_size(&ec.screenRows, &ec.screenCols) == -1)
 		die("init_editor()::get_window_size()");
 
-	ec.screenRows -= 1;
+	ec.screenRows -= 2;
 }
 
 // Program starts here
@@ -654,6 +687,8 @@ int main(int argc, char* argv[argc + 1]) {
 	if (argc >= 2) {
 		editor_open(argv[1]);
 	}
+
+	editor_set_status_message("Ctrl-q: quit");
 
 	/* Refreshes the screen and runs the input gathering and processing function */
 	while (1) {
