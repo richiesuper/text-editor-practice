@@ -25,6 +25,7 @@
 /***** DEFINES *****/
 
 #define EDITOR_NAME "TEd - Text EDit"
+#define EDITOR_AUTHOR "Richie Seputro"
 #define EDITOR_VERSION "4.20.69"
 #define EDITOR_TAB_STOP 8
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -410,19 +411,36 @@ void editor_draw_rows(struct AppendBuffer* ab) {
 		if (fileRow >= ec.numRows) {
 			if (ec.numRows == 0 && y == ec.screenRows / 3) {
 				char welcome[80];
+
 				int welcomeLen = snprintf(welcome, sizeof welcome, "%s -- version %s", EDITOR_NAME, EDITOR_VERSION);
 
 				if (welcomeLen > ec.screenCols) welcomeLen = ec.screenCols;
 
-				int padding = (ec.screenCols - welcomeLen) / 2;
-				if (padding) {
-					ab_append(ab, "~", 1);
-					padding--;
-				}
+				int wpadding = (ec.screenCols - welcomeLen) / 2;
 
-				while (padding--) ab_append(ab, " ", 1);
+				if (wpadding) {
+					ab_append(ab, "~", 1);
+					wpadding--;
+				}
+				while (wpadding--) ab_append(ab, " ", 1);
 
 				ab_append(ab, welcome, welcomeLen); // Appends the welcome message
+			} else if (ec.numRows == 0 && y == (ec.screenRows / 3) + 2) {
+				char author[80];
+
+				int authorLen = snprintf(author, sizeof author, "Made by %s", EDITOR_AUTHOR);
+
+				if (authorLen > ec.screenCols) authorLen = ec.screenCols;
+
+				int apadding = (ec.screenCols - authorLen) / 2;
+
+				if (apadding) {
+					ab_append(ab, "~", 1);
+					apadding--;
+				}
+				while (apadding--) ab_append(ab, " ", 1);
+
+				ab_append(ab, author, authorLen); // Appends the author message
 			} else {
 				ab_append(ab, "~", 1); // Append a tilde to buffer
 			}
