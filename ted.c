@@ -30,6 +30,7 @@
 #define EDITOR_NAME "TEd - Text EDit"
 #define EDITOR_AUTHOR "Richie Seputro"
 #define EDITOR_VERSION "4.20.69"
+#define EDITOR_QUIT_TIMES 3
 #define STATUS_DURATION 8
 #define EDITOR_TAB_STOP 8
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -73,6 +74,8 @@ struct EditorConfig {
 
 	int numRows;
 	struct EditorRow* row;
+
+	int modified;
 
 	char* filename;
 
@@ -339,6 +342,7 @@ void editor_append_row(char* s, size_t len) {
 	editor_update_row(&ec.row[at]);
 
 	ec.numRows++;
+	ec.modified++;
 }
 
 void editor_row_insert_char(struct EditorRow* row, int at, int c) {
@@ -362,6 +366,7 @@ void editor_insert_char(int c) {
 
 	editor_row_insert_char(&ec.row[ec.cury], ec.curx, c);
 	ec.curx++;
+	ec.modified++;
 }
 
 /***** FILE IO *****/
@@ -410,6 +415,7 @@ void editor_open(char* filename) {
 
 	free(line);
 	fclose(fp);
+	ec.modified = 0;
 }
 
 void editor_save(void) {
@@ -426,6 +432,7 @@ void editor_save(void) {
 			if (write(fd, buf, len) == len) {
 				close(fd);
 				free(buf);
+				ec.modified = 0;
 				editor_set_status_message("%s: %d bytes written to disk", ec.filename, len);
 				return;
 			}
@@ -551,7 +558,7 @@ void editor_draw_status_bar(struct AppendBuffer* ab) {
 	char status[80];
 	char rstatus[80];
 
-	int len = snprintf(status, sizeof status, "%.20s - %d lines", ec.filename ? ec.filename : "[No Name]", ec.numRows);
+	int len = snprintf(status, sizeof status, "%.20s - %d lines %s", ec.filename ? ec.filename : "[No Name]", ec.numRows, ec.modified ? "(modified)" : "");
 	int rlen = snprintf(rstatus, sizeof rstatus, "%d/%d", ec.cury + 1, ec.numRows);
 
 	if (len > ec.screenCols) {
@@ -682,6 +689,7 @@ void editor_move_cursor(int key) {
 
 // Handles keypress input
 void editor_process_keypress(void) {
+	static int quitTimes = EDITOR_QUIT_TIMES;
 	int c = editor_read_key();
 
 	switch (c) {
@@ -691,6 +699,12 @@ void editor_process_keypress(void) {
 
 		// If input is Ctrl-q, exit the program with return value of 0 (success)
 		case CTRL_KEY('q'):
+			if (ec.modified && quitTimes > 0) {
+				editor_set_status_message("File has unsaved changes! Press Ctrl-q %d more times to quit.", quitTimes);
+				quitTimes--;
+				return;
+			}
+
 			write(STDOUT_FILENO, "\x1b[2J", 4); // Clears the screen
 			write(STDOUT_FILENO, "\x1b[H", 3); // Reposition the cursor to row 1 collumn 1
 			exit(0);
@@ -750,6 +764,8 @@ void editor_process_keypress(void) {
 			editor_insert_char(c);
 			break;
 	}
+
+	quitTimes = EDITOR_QUIT_TIMES;
 }
 
 /***** INIT *****/
@@ -764,6 +780,7 @@ void init_editor(void) {
 	ec.colOffset = 0;
 	ec.numRows = 0;
 	ec.row = NULL;
+	ec.modified = 0;
 	ec.filename = NULL;
 	ec.statusmsg[0] = '\0';
 	ec.statusmsg_time = 0;
