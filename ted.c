@@ -345,6 +345,22 @@ void editor_append_row(char* s, size_t len) {
 	ec.modified++;
 }
 
+void editor_free_row(struct EditorRow* row) {
+	free(row->render);
+	free(row->chars);
+}
+
+void editor_del_row(int at) {
+	if (at < 0 || at >= ec.numRows) {
+		return;
+	}
+
+	editor_free_row(&ec.row[at]);
+	memmove(&ec.row[at], &ec.row[at + 1], sizeof(struct EditorRow) * (ec.numRows - at - 1));
+	ec.numRows--;
+	ec.modified++;
+}
+
 void editor_row_insert_char(struct EditorRow* row, int at, int c) {
 	if (at < 0 || at > row->size) {
 		at = row->size;
@@ -357,6 +373,26 @@ void editor_row_insert_char(struct EditorRow* row, int at, int c) {
 	editor_update_row(row);
 }
 
+void editor_row_append_string(struct EditorRow* row, char* s, size_t len) {
+	row->chars = realloc(row->chars, row->size + len + 1);
+	memcpy(&row->chars[row->size], s, len);
+	row->size += len;
+	row->chars[row->size] = '\0';
+	editor_update_row(row);
+	ec.modified++;
+}
+
+void editor_row_del_char(struct EditorRow* row, int at) {
+	if (at < 0 || at >= row->size) {
+		return;
+	}
+
+	memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+	row->size--;
+	editor_update_row(row);
+	ec.modified++;
+}
+
 /***** EDITOR OPERATIONS *****/
 
 void editor_insert_char(int c) {
@@ -367,6 +403,27 @@ void editor_insert_char(int c) {
 	editor_row_insert_char(&ec.row[ec.cury], ec.curx, c);
 	ec.curx++;
 	ec.modified++;
+}
+
+void editor_del_char(void) {
+	if (ec.cury == ec.numRows) {
+		return;
+	}
+
+	if (ec.curx == 0 && ec.cury == 0) {
+		return;
+	}
+
+	struct EditorRow* row = &ec.row[ec.cury];
+	if (ec.curx > 0) {
+		editor_row_del_char(row, ec.curx - 1);
+		ec.curx--;
+	} else {
+		ec.curx = ec.row[ec.cury - 1].size;
+		editor_row_append_string(&ec.row[ec.cury - 1], row->chars, row->size);
+		editor_del_row(ec.cury);
+		ec.cury--;
+	}
 }
 
 /***** FILE IO *****/
@@ -726,7 +783,11 @@ void editor_process_keypress(void) {
 		case BACKSPACE:
 		case CTRL_KEY('h'):
 		case DEL:
-			/* TODO */
+			if (c == DEL) {
+				editor_move_cursor(ARROW_RIGHT);
+			}
+			editor_del_char();
+
 			break;
 
 		case PAGE_UP:
