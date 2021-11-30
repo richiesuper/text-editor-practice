@@ -14,6 +14,7 @@
 // Actual Includes
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -34,6 +35,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum EditorKey {
+	BACKSPACE = 127,
 	ARROW_LEFT = 1000,
 	ARROW_RIGHT,
 	ARROW_UP,
@@ -77,6 +79,10 @@ struct EditorConfig {
 	char statusmsg[80];
 	time_t statusmsg_time;
 } ec;
+
+/***** FUNCTION PROTOTYPES *****/
+
+void editor_set_status_message(const char* fmt, ...);
 
 /***** TERMINAL *****/
 
@@ -360,6 +366,27 @@ void editor_insert_char(int c) {
 
 /***** FILE IO *****/
 
+char* editor_rows_to_string(int* buflen) {
+	int totlen = 0;
+	for (int j = 0; j < ec.numRows; j++) {
+		totlen += ec.row[j].size + 1;
+	}
+
+	*buflen = totlen;
+
+	char* buf = malloc(totlen);
+	char* p = buf;
+
+	for (int j = 0; j < ec.numRows; j++) {
+		memcpy(p, ec.row[j].chars, ec.row[j].size);
+		p += ec.row[j].size;
+		*p = '\n';
+		p++;
+	}
+
+	return buf;
+}
+
 void editor_open(char* filename) {
 	free(ec.filename);
 	ec.filename = strdup(filename);
@@ -383,6 +410,32 @@ void editor_open(char* filename) {
 
 	free(line);
 	fclose(fp);
+}
+
+void editor_save(void) {
+	if (ec.filename == NULL) {
+		return;
+	}
+
+	int len;
+	char* buf = editor_rows_to_string(&len);
+
+	int fd = open(ec.filename, O_RDWR | O_CREAT, 0644);
+	if (fd != 1) {
+		if (ftruncate(fd, len) != -1) {
+			if (write(fd, buf, len) == len) {
+				close(fd);
+				free(buf);
+				editor_set_status_message("%s: %d bytes written to disk", ec.filename, len);
+				return;
+			}
+		}
+
+		close(fd);
+	}
+
+	free(buf);
+	editor_set_status_message("%s: save failed! I/O error: %s", strerror(errno));
 }
 
 /***** APPEND BUFFER *****/
@@ -632,11 +685,19 @@ void editor_process_keypress(void) {
 	int c = editor_read_key();
 
 	switch (c) {
+		case '\r':
+			/* TODO */
+			break;
+
 		// If input is Ctrl-q, exit the program with return value of 0 (success)
 		case CTRL_KEY('q'):
 			write(STDOUT_FILENO, "\x1b[2J", 4); // Clears the screen
 			write(STDOUT_FILENO, "\x1b[H", 3); // Reposition the cursor to row 1 collumn 1
 			exit(0);
+			break;
+
+		case CTRL_KEY('s'):
+			editor_save();
 			break;
 
 		case HOME:
@@ -646,6 +707,12 @@ void editor_process_keypress(void) {
 			if (ec.cury < ec.numRows) {
 				ec.curx = ec.row[ec.cury].size;
 			}
+			break;
+
+		case BACKSPACE:
+		case CTRL_KEY('h'):
+		case DEL:
+			/* TODO */
 			break;
 
 		case PAGE_UP:
@@ -673,6 +740,10 @@ void editor_process_keypress(void) {
 		case ARROW_UP:
 		case ARROW_DOWN:
 			editor_move_cursor(c);
+			break;
+
+		case CTRL_KEY('l'):
+		case '\x1b':
 			break;
 
 		default:
@@ -715,7 +786,7 @@ int main(int argc, char* argv[argc + 1]) {
 		editor_open(argv[1]);
 	}
 
-	editor_set_status_message("Ctrl-q: quit");
+	editor_set_status_message("Ctrl-s: save | Ctrl-q: quit");
 
 	/* Refreshes the screen and runs the input gathering and processing function */
 	while (1) {
