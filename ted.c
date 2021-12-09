@@ -27,7 +27,7 @@
 
 /***** DEFINES *****/
 
-#define EDITOR_NAME "TEd - Text EDit"
+#define EDITOR_NAME "TED - Text EDit"
 #define EDITOR_AUTHOR "Richie Seputro"
 #define EDITOR_VERSION "4.20.69"
 #define EDITOR_QUIT_TIMES 3
@@ -326,10 +326,13 @@ void editor_update_row(struct EditorRow* row) {
 	row->rsize = idx;
 }
 
-void editor_append_row(char* s, size_t len) {
-	ec.row = realloc(ec.row, sizeof(struct EditorRow) * (ec.numRows + 1));
+void editor_insert_row(int at, char* s, size_t len) {
+	if (at < 0 || at > ec.numRows) {
+		return;
+	}
 
-	int at = ec.numRows;
+	ec.row = realloc(ec.row, sizeof(struct EditorRow) * (ec.numRows + 1));
+	memmove(&ec.row[at + 1], &ec.row[at], sizeof(struct EditorRow) * (ec.numRows - at));
 
 	ec.row[at].size = len;
 	ec.row[at].chars = malloc(len + 1);
@@ -397,12 +400,28 @@ void editor_row_del_char(struct EditorRow* row, int at) {
 
 void editor_insert_char(int c) {
 	if (ec.cury == ec.numRows) {
-		editor_append_row("", 0);
+		editor_insert_row(ec.numRows, "", 0);
 	}
 
 	editor_row_insert_char(&ec.row[ec.cury], ec.curx, c);
 	ec.curx++;
 	ec.modified++;
+}
+
+void editor_insert_newline(void) {
+	if (ec.curx == 0) {
+		editor_insert_row(ec.cury, "", 0);
+	} else {
+		struct EditorRow* row = &ec.row[ec.cury];
+		editor_insert_row(ec.cury + 1, &row->chars[ec.curx], row->size - ec.curx);
+		row = &ec.row[ec.cury];
+		row->size = ec.curx;
+		row->chars[row->size] = '\0';
+		editor_update_row(row);
+	}
+
+	ec.cury++;
+	ec.curx = 0;
 }
 
 void editor_del_char(void) {
@@ -467,7 +486,7 @@ void editor_open(char* filename) {
 			lineLen--;
 		}
 
-		editor_append_row(line, lineLen);
+		editor_insert_row(ec.numRows, line, lineLen);
 	}
 
 	free(line);
@@ -751,7 +770,7 @@ void editor_process_keypress(void) {
 
 	switch (c) {
 		case '\r':
-			/* TODO */
+			editor_insert_newline();
 			break;
 
 		// If input is Ctrl-q, exit the program with return value of 0 (success)
