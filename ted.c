@@ -564,10 +564,20 @@ void editor_find_callback(char* query, int key) {
 }
 
 void editor_find(void) {
+	int savedCurx = ec.curx;
+	int savedCury = ec.cury;
+	int savedColOffset = ec.colOffset;
+	int savedRowOffset = ec.rowOffset;
+
 	char* query = editor_prompt("Search: %s (ESC to cancel)", editor_find_callback);
 
 	if (query) {
 		free(query);
+	} else {
+		ec.curx = savedCurx;
+		ec.cury = savedCury;
+		ec.colOffset = savedColOffset;
+		ec.rowOffset = savedRowOffset;
 	}
 }
 
