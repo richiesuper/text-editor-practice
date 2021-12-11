@@ -297,6 +297,23 @@ int editor_row_curx_to_rx(struct EditorRow* row, int curx) {
 	return rx;
 }
 
+int editor_row_rx_to_curx(struct EditorRow* row, int rx) {
+	int curRx = 0;
+	int curx;
+	for (curx = 0; curx < row->size; curx++) {
+		if (row->chars[curx] == '\t') {
+			curRx += (EDITOR_TAB_STOP - 1) - (curRx % EDITOR_TAB_STOP);
+		}
+		curRx++;
+
+		if (curRx > rx) {
+			return curx;
+		}
+	}
+
+	return curx;
+}
+
 void editor_update_row(struct EditorRow* row) {
 	int tabs = 0;
 	for (int j = 0; j < row->size; j++) {
@@ -525,6 +542,26 @@ void editor_save(void) {
 
 	free(buf);
 	editor_set_status_message("%s: save failed! I/O error: %s", strerror(errno));
+}
+
+/***** FIND *****/
+
+void editor_find(void) {
+	char* query = editor_prompt("Search: %s (ESC to cancel)");
+	if (query == NULL) return;
+
+	for (int i = 0; i < ec.numRows; i++) {
+		struct EditorRow* row = &ec.row[i];
+		char* match = strstr(row->render, query);
+		if (match) {
+			ec.cury = i;
+			ec.curx = editor_row_rx_to_curx(row, match - row->render);
+			ec.rowOffset = ec.numRows;
+			break;
+		}
+	}
+
+	free(query);
 }
 
 /***** APPEND BUFFER *****/
@@ -841,6 +878,10 @@ void editor_process_keypress(void) {
 			}
 			break;
 
+		case CTRL_KEY('f'):
+			editor_find();
+			break;
+
 		case BACKSPACE:
 		case CTRL_KEY('h'):
 		case DEL:
@@ -925,7 +966,7 @@ int main(int argc, char* argv[argc + 1]) {
 		editor_open(argv[1]);
 	}
 
-	editor_set_status_message("Ctrl-s: save | Ctrl-q: quit");
+	editor_set_status_message("Ctrl-s: save | Ctrl-q: quit | Ctrl-f = find");
 
 	/* Refreshes the screen and runs the input gathering and processing function */
 	while (1) {
