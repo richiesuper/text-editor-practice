@@ -87,7 +87,7 @@ struct EditorConfig {
 
 void editor_set_status_message(const char* fmt, ...);
 void editor_refresh_screen(void);
-char* editor_prompt(char* prompt);
+char* editor_prompt(char* prompt, void (*callback)(char*, int));
 
 /***** TERMINAL *****/
 
@@ -515,7 +515,7 @@ void editor_open(char* filename) {
 
 void editor_save(void) {
 	if (ec.filename == NULL) {
-		ec.filename = editor_prompt("Save as: %s (ESC to cancel)");
+		ec.filename = editor_prompt("Save as: %s (ESC to cancel)", NULL);
 		if (ec.filename == NULL) {
 			editor_set_status_message("Save aborted");
 			return;
@@ -546,9 +546,10 @@ void editor_save(void) {
 
 /***** FIND *****/
 
-void editor_find(void) {
-	char* query = editor_prompt("Search: %s (ESC to cancel)");
-	if (query == NULL) return;
+void editor_find_callback(char* query, int key) {
+	if (key == '\r' || key == '\x1b') {
+		return;
+	}
 
 	for (int i = 0; i < ec.numRows; i++) {
 		struct EditorRow* row = &ec.row[i];
@@ -560,8 +561,14 @@ void editor_find(void) {
 			break;
 		}
 	}
+}
 
-	free(query);
+void editor_find(void) {
+	char* query = editor_prompt("Search: %s (ESC to cancel)", editor_find_callback);
+
+	if (query) {
+		free(query);
+	}
 }
 
 /***** APPEND BUFFER *****/
@@ -766,7 +773,7 @@ void editor_set_status_message(const char* fmt, ...) {
 
 /***** INPUT *****/
 
-char* editor_prompt(char* prompt) {
+char* editor_prompt(char* prompt, void (*callback)(char*, int)) {
 	size_t bufsize = 128;
 	char* buf = malloc(bufsize);
 
@@ -784,11 +791,19 @@ char* editor_prompt(char* prompt) {
 			}
 		} else if (c == '\x1b') {
 			editor_set_status_message("");
+			if (callback) {
+				callback(buf, c);
+			}
+
 			free(buf);
 			return NULL;
 		} else if (c == '\r') {
 			if (buflen != 0) {
 				editor_set_status_message("");
+				if (callback) {
+					callback(buf, c);
+				}
+
 				return buf;
 			}
 		} else if (!iscntrl(c) && c < 128) {
@@ -798,6 +813,10 @@ char* editor_prompt(char* prompt) {
 			}
 			buf[buflen++] = c;
 			buf[buflen] = '\0';
+		}
+
+		if (callback) {
+			callback(buf, c);
 		}
 	}
 }
