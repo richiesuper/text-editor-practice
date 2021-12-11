@@ -547,15 +547,46 @@ void editor_save(void) {
 /***** FIND *****/
 
 void editor_find_callback(char* query, int key) {
+	/* lastMatch will store the index of the last match is such match existed, or -1 if no such match existed */
+	static int lastMatch = -1;
+
+	/* direction will store the value 1 if it's forward and -1 if it's backward */
+	static int direction = 1;
+
 	if (key == '\r' || key == '\x1b') {
+		/* Restore lastMatch and direction's initial value */
+		lastMatch = -1;
+		direction = 1;
 		return;
+	} else if (key == ARROW_RIGHT || key == ARROW_DOWN) {
+		direction = 1;
+	} else if (key == ARROW_LEFT || key == ARROW_RIGHT) {
+		direction = -1;
+	} else {
+		lastMatch = -1;
+		direction = 1;
 	}
 
+	if (lastMatch == -1) {
+		direction = 1;
+	}
+
+	int current = lastMatch;
 	for (int i = 0; i < ec.numRows; i++) {
-		struct EditorRow* row = &ec.row[i];
+		current += direction;
+
+		/* Search wrapping logic */
+		if (current == -1) {
+			current = ec.numRows - 1;
+		} else if (current == ec.numRows) {
+			current = 0;
+		}
+
+		struct EditorRow* row = &ec.row[current];
 		char* match = strstr(row->render, query);
 		if (match) {
-			ec.cury = i;
+			lastMatch = current;
+			ec.cury = current;
 			ec.curx = editor_row_rx_to_curx(row, match - row->render);
 			ec.rowOffset = ec.numRows;
 			break;
@@ -569,7 +600,7 @@ void editor_find(void) {
 	int savedColOffset = ec.colOffset;
 	int savedRowOffset = ec.rowOffset;
 
-	char* query = editor_prompt("Search: %s (ESC to cancel)", editor_find_callback);
+	char* query = editor_prompt("Search: %s (Use ESC/Arrows/Enter)", editor_find_callback);
 
 	if (query) {
 		free(query);
